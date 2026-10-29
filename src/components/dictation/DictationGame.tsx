@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { acceptsChar, isTypable, makeCloze, type Difficulty } from "@/lib/dictation/cloze";
-import { recordScore } from "@/lib/dictation/store";
+import { recordScore, saveTranslation, useDictationState } from "@/lib/dictation/store";
+import { translateToTurkish } from "@/lib/dictation/translate";
 import { sfx } from "@/lib/sound";
 import { speakGerman, stopSpeaking } from "@/lib/speech";
 import { Icon } from "../icons";
@@ -117,7 +118,9 @@ export function DictationGame({
   const input = useRef<HTMLInputElement>(null);
   const reducedMotion = useReducedMotion();
 
+  const { tr: trCache } = useDictationState();
   const line = lines[state.line];
+  const meaning = line.tr ?? trCache[line.de.trim()];
   const timed = videoId !== undefined && line.start !== undefined;
   const segments = useMemo(() => makeCloze(line.de, difficulty, round * 97 + state.line), [line.de, difficulty, round, state.line]);
   const { slots, wordEnds } = useMemo(() => slotsOf(segments), [segments]);
@@ -142,6 +145,14 @@ export function DictationGame({
   }, [state.line, round, state.finished]);
 
   useEffect(() => stopSpeaking, []);
+
+  // Lines of an added song come without a Turkish meaning: fetch it while the learner types.
+  useEffect(() => {
+    if (meaning) return;
+    translateToTurkish(line.de).then((t) => {
+      if (t) saveTranslation(line.de, t);
+    });
+  }, [line.de, meaning]);
 
   const advance = () => {
     if (!state.lineDone) return;
@@ -285,7 +296,7 @@ export function DictationGame({
                 className="hand-bold text-2xl leading-[2.6rem] sm:text-[1.7rem]"
               />
               <p lang="tr" className={cn("mt-2 min-h-7 font-note text-xl font-bold text-graphite", !state.lineDone && "invisible")}>
-                {line.tr}
+                {meaning}
               </p>
             </div>
           </div>

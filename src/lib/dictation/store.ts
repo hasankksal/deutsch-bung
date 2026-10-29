@@ -11,6 +11,8 @@ export interface UserSong {
   kind?: "song" | "film";
   /** YouTube video id, played with YouTube's own embedded player */
   videoId?: string;
+  /** Spotify track id, played with Spotify's own embedded player */
+  spotifyId?: string;
   /** Played from a video or audio file on the learner's device, picked again each time (files are not stored) */
   localFile?: boolean;
   /** Name of that file, to remind which one to pick */
@@ -32,12 +34,14 @@ export interface DictationState {
   v: 1;
   songs: UserSong[];
   best: Record<string, BestScore>;
+  /** Turkish meanings fetched for lines that came without one, by German text */
+  tr: Record<string, string>;
 }
 
 const STORAGE_KEY = "almanca-pratik:dinle:v1";
 
 function defaultState(): DictationState {
-  return { v: 1, songs: [], best: {} };
+  return { v: 1, songs: [], best: {}, tr: {} };
 }
 
 const SERVER_STATE = defaultState();
@@ -126,6 +130,10 @@ export function setSongOffset(id: string, offset: number) {
 
 export function setSongFileName(id: string, fileName: string) {
   update((s) => ({ ...s, songs: s.songs.map((song) => (song.id === id ? { ...song, fileName } : song)) }));
+}
+
+export function saveTranslation(de: string, tr: string) {
+  update((s) => ({ ...s, tr: { ...s.tr, [de.trim()]: tr } }));
 }
 
 export function removeSong(id: string) {

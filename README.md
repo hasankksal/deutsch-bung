@@ -14,7 +14,7 @@ Türkçe cümleleri Almancaya çevirerek öğrenme sitesi. Seviyeni ve konunu se
 - **Defterim:** Yıldızladığın kelimeleri kartlarla tekrar edersin; Anki için CSV indirebilirsin.
 - **İlerleme:** En sık yaptığın hata türleri, konulara göre başarın, günlük hedefin ve serin.
 - **Sesli dinleme:** Almanca cümleler tarayıcının kendi sesiyle okunur.
-- **Dinle & Yaz:** Gerçek bir şarkı ya da film sahnesi çalarken sözler karaoke gibi akar, vurgulu satırdaki boşlukları yazarsın; yetişemezsen şarkı seni bekler. Şarkının zamanlı sözleri LRCLIB'den aranır, filmler için Almanca altyazı dosyası (.srt/.vtt) yüklenir. Ses YouTube'dan ya da kendi dosyandan çalar. Sözler ve altyazılar sadece senin tarayıcında saklanır. Isınmak için hazır diyaloglar ve telifsiz şiirler de var.
+- **Dinle & Yaz:** Spotify ya da YouTube linkini yapıştırırsın; şarkı ve zamanlı sözleri (LRCLIB) kendiliğinden bulunur. Şarkı çalarken sözler karaoke gibi akar, vurgulu satırdaki boşlukları yazarsın; yetişemezsen şarkı seni bekler. Her satırın Türkçesi otomatik çevrilir (MyMemory) ve satırı bitirince görünür. Filmler için Almanca altyazı dosyası (.srt/.vtt) ve video yüklenir. Sözler, çeviriler ve altyazılar sadece senin tarayıcında saklanır. Isınmak için hazır diyaloglar ve telifsiz şiirler de var.
 
 Bütün ilerleme tarayıcının kendi hafızasında (localStorage) saklanır. Hesap, veritabanı ya da sunucu tarafı servis gerekmez.
 

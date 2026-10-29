@@ -150,6 +150,7 @@ export function DictationView() {
   const playSong = (song: UserSong) => {
     if (isTimed(song) && song.localFile) return setView({ kind: "pick", songId: song.id });
     if (isTimed(song) && song.videoId) return setView({ kind: "live", songId: song.id, source: { kind: "youtube", videoId: song.videoId } });
+    if (isTimed(song) && song.spotifyId) return setView({ kind: "live", songId: song.id, source: { kind: "spotify", trackId: song.spotifyId } });
     setView({ kind: "play", key: `song:${song.id}`, title: song.title, lines: songLines(song), videoId: song.videoId });
   };
 
@@ -194,7 +195,7 @@ export function DictationView() {
               className="sketch jitter-hover -rotate-[0.5deg] bg-marker px-4 py-4 text-left transition hover:rotate-0"
             >
               <span className="hand-bold block text-lg">+ Şarkı ekle</span>
-              <span className="text-sm text-ink/80">Sanatçıyı ve şarkıyı yaz, zamanlı sözler gelsin; YouTube&apos;dan ya da kendi mp3&apos;ünden çal.</span>
+              <span className="text-sm text-ink/80">Spotify ya da YouTube linkini yapıştır; şarkı, zamanlı sözleri ve Türkçesi kendiliğinden gelsin.</span>
             </button>
             <button
               type="button"
@@ -213,7 +214,7 @@ export function DictationView() {
           <ul className="space-y-3">
             {songs.map((song) => {
               const timed = isTimed(song);
-              const media = song.videoId ? "YouTube" : song.localFile ? "Kendi dosyan" : "Sesli okuma";
+              const media = song.videoId ? "YouTube" : song.spotifyId ? "Spotify" : song.localFile ? "Kendi dosyan" : "Sesli okuma";
               return (
                 <li key={song.id}>
                   <Card className="space-y-2 p-4 sm:p-4">

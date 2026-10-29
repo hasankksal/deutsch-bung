@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { lineEnd, makeCloze, type Difficulty, type SongLine } from "@/lib/dictation/cloze";
 import { decideTick, initialLiveState, liveReducer, liveScore, type LiveMode, type TimedLine } from "@/lib/dictation/live";
-import { recordScore, useDictationState } from "@/lib/dictation/store";
+import { recordScore, saveTranslation, useDictationState } from "@/lib/dictation/store";
+import { translateToTurkish } from "@/lib/dictation/translate";
 import { sfx } from "@/lib/sound";
 import { Icon } from "../icons";
 import { Led } from "../SlotMachine";
@@ -11,9 +12,13 @@ import { Button, Chip, LABEL, Segmented, cn } from "../ui";
 import { ClozeLine, NO_HINTS, slotsOf } from "./ClozeLine";
 import { DIFFICULTY_LABEL } from "./DictationGame";
 import { FilePlayer } from "./FilePlayer";
+import { SpotifyPlayer } from "./SpotifyPlayer";
 import { YouTubePlayer, type PlayerHandle } from "./YouTubePlayer";
 
-export type LiveSource = { kind: "youtube"; videoId: string } | { kind: "file"; url: string; audio: boolean };
+export type LiveSource =
+  | { kind: "youtube"; videoId: string }
+  | { kind: "spotify"; trackId: string }
+  | { kind: "file"; url: string; audio: boolean };
 
 const SPECIAL_CHARS = ["ä", "ö", "ü", "ß"];
 const TICK_MS = 100;
@@ -22,6 +27,8 @@ const WINDOW = 14;
 /** After a seek the page made itself, seek detection rests for a moment */
 const SELF_SEEK_MS = 700;
 const RATES = [1, 0.85, 0.7];
+/** Lines ahead whose Turkish meaning is fetched in advance */
+const TRANSLATE_AHEAD = 3;
 
 function fmtOffset(o: number): string {
   return `${o > 0 ? "+" : o < 0 ? "−" : "±"}${Math.abs(o).toFixed(1)} sn`;
@@ -58,11 +65,13 @@ export function LiveGame({
 
   const [state, dispatch] = useReducer(liveReducer, undefined, initialLiveState);
   const [mode, setMode] = useState<LiveMode>("bekle");
+  const [showTr, setShowTr] = useState<"sonra" | "hemen">("sonra");
   const [rate, setRate] = useState(1);
   const [now, setNow] = useState(0);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { best } = useDictationState();
+  const { best, tr: trCache } = useDictationState();
+  const meaning = (l: SongLine) => l.tr ?? trCache[l.text.trim()];
   const bestKey = `${scoreKey}:${difficulty}`;
   const [bestAtStart] = useState(() => best[bestKey]);
 
@@ -120,6 +129,16 @@ export function LiveGame({
     }
     waitingOn.current = state.pausedFor;
   }, [state.line, state.pausedFor, timedLines.length]);
+
+  // Turkish meanings for the current line and the next few, fetched as the song goes.
+  useEffect(() => {
+    for (const l of timedLines.slice(state.line, state.line + 1 + TRANSLATE_AHEAD)) {
+      if (l.tr || trCache[l.text.trim()]) continue;
+      translateToTurkish(l.text).then((t) => {
+        if (t) saveTranslation(l.text, t);
+      });
+    }
+  }, [state.line, timedLines, trCache]);
 
   // Keep the current line in the middle of the lyrics panel, like a karaoke screen.
   useEffect(() => {
@@ -208,9 +227,11 @@ export function LiveGame({
         <Chip className="ml-auto shrink-0">{DIFFICULTY_LABEL[difficulty]}</Chip>
       </div>
 
-      <div className={cn("sketch sketch-bold overflow-hidden bg-ink p-1.5", source.kind === "file" && source.audio && "bg-sheet")}>
+      <div className={cn("sketch sketch-bold overflow-hidden bg-ink p-1.5", ((source.kind === "file" && source.audio) || source.kind === "spotify") && "bg-sheet")}>
         {source.kind === "youtube" ? (
           <YouTubePlayer videoId={source.videoId} handleRef={player} className="aspect-video w-full" onReady={() => setReady(true)} onError={setError} />
+        ) : source.kind === "spotify" ? (
+          <SpotifyPlayer trackId={source.trackId} handleRef={player} className="h-[152px] w-full" onReady={() => setReady(true)} onError={setError} />
         ) : (
           <FilePlayer
             url={source.url}
@@ -222,6 +243,9 @@ export function LiveGame({
         )}
       </div>
       {error && <p className="text-sm text-red-pencil">{error}</p>}
+      {source.kind === "spotify" && (
+        <p className="text-xs text-pencil">Spotify&apos;a bu tarayıcıda giriş yaptıysan şarkının tamamı çalar; yoksa Spotify sadece 30 saniyelik önizleme verir.</p>
+      )}
 
       {finished ? (
         <div className="animate-rise space-y-4">
@@ -287,6 +311,11 @@ export function LiveGame({
                           cursor
                           className="hand-bold text-[1.45rem] leading-[2.3rem] sm:text-2xl"
                         />
+                        {showTr === "hemen" && meaning(l) && (
+                          <span lang="tr" className="block font-note text-xl leading-tight font-bold text-graphite">
+                            {meaning(l)}
+                          </span>
+                        )}
                         <span aria-hidden="true" className="mt-1 block h-1 overflow-hidden rounded-full bg-ink/10">
                           <span className="block h-full bg-red-pencil/70 transition-[width] duration-100 ease-linear" style={{ width: `${progress * 100}%` }} />
                         </span>
@@ -310,7 +339,11 @@ export function LiveGame({
                         missedFrom={result?.missedFrom ?? null}
                         className="text-lg leading-8"
                       />
-                      {result && l.tr && <span className="block font-note text-lg leading-tight text-graphite">{l.tr}</span>}
+                      {(result || (showTr === "hemen" && i > state.line)) && meaning(l) && (
+                        <span lang="tr" className="block font-note text-lg leading-tight text-graphite">
+                          {meaning(l)}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -391,14 +424,28 @@ export function LiveGame({
               />
             </div>
             <div className="space-y-1">
-              <p className={LABEL}>Hız</p>
+              <p className={LABEL}>Türkçesi</p>
               <Segmented
-                label="Hız"
-                value={String(rate)}
-                onChange={(v) => changeRate(Number(v))}
-                options={RATES.map((r) => ({ value: String(r), label: `${r}×` }))}
+                label="Türkçesi"
+                value={showTr}
+                onChange={setShowTr}
+                options={[
+                  { value: "sonra", label: "Satır bitince", title: "Önce kendin anlamaya çalış" },
+                  { value: "hemen", label: "Hep göster" },
+                ]}
               />
             </div>
+            {source.kind !== "spotify" && (
+              <div className="space-y-1">
+                <p className={LABEL}>Hız</p>
+                <Segmented
+                  label="Hız"
+                  value={String(rate)}
+                  onChange={(v) => changeRate(Number(v))}
+                  options={RATES.map((r) => ({ value: String(r), label: `${r}×` }))}
+                />
+              </div>
+            )}
             <div className="space-y-1 sm:col-span-2">
               <p className={LABEL}>Sözler videoyla kaymışsa ({fmtOffset(offset)})</p>
               <div className="flex flex-wrap items-center gap-2">

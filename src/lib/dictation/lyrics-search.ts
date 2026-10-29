@@ -26,6 +26,14 @@ interface ApiHit {
   plainLyrics?: string | null;
 }
 
+/** Some entries separate several artists with NUL and byte-order-mark characters. */
+function tidy(s: string): string {
+  return s
+    .replace(/\u0000\uFEFF?/g, ", ")
+    .replace(/\uFEFF/g, "")
+    .trim();
+}
+
 export async function searchLyrics(artist: string, track: string, signal?: AbortSignal): Promise<LyricsHit[]> {
   const params = new URLSearchParams();
   if (artist.trim() && track.trim()) {
@@ -39,9 +47,9 @@ export async function searchLyrics(artist: string, track: string, signal?: Abort
     .filter((h) => !h.instrumental && (h.syncedLyrics || h.plainLyrics))
     .map((h) => ({
       id: h.id,
-      artist: h.artistName,
-      track: h.trackName,
-      album: h.albumName ?? undefined,
+      artist: tidy(h.artistName),
+      track: tidy(h.trackName),
+      album: h.albumName ? tidy(h.albumName) : undefined,
       duration: h.duration,
       synced: h.syncedLyrics || null,
       plain: h.plainLyrics || null,
