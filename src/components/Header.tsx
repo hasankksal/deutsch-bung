@@ -8,6 +8,7 @@ import { cn, useNow } from "./ui";
 
 const NAV = [
   { href: "/", label: "Pratik" },
+  { href: "/dinle", label: "Dinle" },
   { href: "/defter", label: "Defterim" },
   { href: "/ilerleme", label: "İlerleme" },
 ];

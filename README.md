@@ -14,6 +14,7 @@ Türkçe cümleleri Almancaya çevirerek öğrenme sitesi. Seviyeni ve konunu se
 - **Defterim:** Yıldızladığın kelimeleri kartlarla tekrar edersin; Anki için CSV indirebilirsin.
 - **İlerleme:** En sık yaptığın hata türleri, konulara göre başarın, günlük hedefin ve serin.
 - **Sesli dinleme:** Almanca cümleler tarayıcının kendi sesiyle okunur.
+- **Dinle & Yaz:** Gerçek bir şarkı ya da film sahnesi çalarken sözler karaoke gibi akar, vurgulu satırdaki boşlukları yazarsın; yetişemezsen şarkı seni bekler. Şarkının zamanlı sözleri LRCLIB'den aranır, filmler için Almanca altyazı dosyası (.srt/.vtt) yüklenir. Ses YouTube'dan ya da kendi dosyandan çalar. Sözler ve altyazılar sadece senin tarayıcında saklanır. Isınmak için hazır diyaloglar ve telifsiz şiirler de var.
 
 Bütün ilerleme tarayıcının kendi hafızasında (localStorage) saklanır. Hesap, veritabanı ya da sunucu tarafı servis gerekmez.
 
@@ -33,10 +34,12 @@ src/
   app/
     page.tsx            Pratik ekranı
     defter/             Defterim (yıldızlı kelimeler ve cümleler)
+    dinle/              Dinle & Yaz (dinleyip boşluk doldurma)
     ilerleme/           İlerleme
   components/           Arayüz bileşenleri (slot makinesi, eskiz tasarım)
   lib/
     curriculum.ts       Seviyeler ve konular
+    dictation/          Dinle & Yaz içerikleri, boşluk mantığı ve şarkı kayıtları
     generator/          Cümle şablonları ve hazır cümle bankaları
     grammar/            Almanca ve Türkçe çekim kuralları, kural kartları
     local-grader.ts     Cevap karşılaştırma ve hata açıklama
