@@ -26,6 +26,42 @@ interface ApiHit {
   plainLyrics?: string | null;
 }
 
+export class LyricsBusyError extends Error {
+  constructor() {
+    super("Söz veritabanı şu an yoğun, birkaç saniye sonra tekrar dene.");
+  }
+}
+
+/** Waits `ms`, or rejects as soon as the search is cancelled. */
+function wait(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(t);
+      reject(signal.reason);
+    });
+  });
+}
+
+/** Delays before each retry. LRCLIB is free and busy: it often answers 503 or 429 for a moment. */
+const RETRY_MS = [700, 1500, 3000];
+
+async function fetchWithRetry(url: string, signal?: AbortSignal): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    let res: Response | null = null;
+    try {
+      res = await fetch(url, { signal, headers: { "Lrclib-Client": "almanca-pratik" } });
+    } catch (e) {
+      if (signal?.aborted) throw e;
+      // network hiccup: retried like a busy server
+    }
+    if (res?.ok) return res;
+    if (res && ![429, 500, 502, 503, 504].includes(res.status)) throw new Error(`Sözler aranamadı (${res.status})`);
+    if (attempt >= RETRY_MS.length) throw new LyricsBusyError();
+    await wait(RETRY_MS[attempt], signal);
+  }
+}
+
 /** Some entries separate several artists with NUL and byte-order-mark characters. */
 function tidy(s: string): string {
   return s
@@ -40,8 +76,7 @@ export async function searchLyrics(artist: string, track: string, signal?: Abort
     params.set("artist_name", artist.trim());
     params.set("track_name", track.trim());
   } else params.set("q", `${artist} ${track}`.trim());
-  const res = await fetch(`${API}?${params}`, { signal, headers: { "Lrclib-Client": "almanca-pratik" } });
-  if (!res.ok) throw new Error(`Sözler aranamadı (${res.status})`);
+  const res = await fetchWithRetry(`${API}?${params}`, signal);
   const data = (await res.json()) as ApiHit[];
   return data
     .filter((h) => !h.instrumental && (h.syncedLyrics || h.plainLyrics))

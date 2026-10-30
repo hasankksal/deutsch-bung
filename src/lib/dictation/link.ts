@@ -15,11 +15,35 @@ export function parseSpotifyId(input: string): string | null {
   return m ? m[1] : null;
 }
 
-export function parseMediaLink(input: string): MediaLink | null {
+function parseOne(input: string): MediaLink | null {
   const sp = parseSpotifyId(input);
   if (sp) return { kind: "spotify", id: sp };
   const yt = input.trim() ? parseYouTubeId(input) : null;
   return yt ? { kind: "youtube", id: yt } : null;
+}
+
+/** A link on its own, or somewhere inside shared text ("Hör dir das an: https://…"). */
+export function parseMediaLink(input: string): MediaLink | null {
+  const whole = parseOne(input);
+  if (whole) return whole;
+  for (const token of input.match(/(?:https?:\/\/|spotify:)\S+/g) ?? []) {
+    const found = parseOne(token.replace(/[)\].,;!?"'»”]+$/, ""));
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Why a pasted link cannot be used, when it looks like one we could explain. */
+export function linkProblem(input: string): string | null {
+  const s = input.trim();
+  if (!s || parseMediaLink(s)) return null;
+  if (/spotify\.link\/|spotify\.app\.link\//i.test(s))
+    return "Kısa Spotify linkini açamıyorum. Linki tarayıcıda bir kez aç, adres çubuğundaki open.spotify.com/track/… adresini yapıştır.";
+  if (/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(album|playlist|artist|episode|show)\//i.test(s))
+    return "Bu bir albüm ya da çalma listesi linki. Şarkının kendisini aç: ⋯ → Paylaş → Şarkı bağlantısını kopyala.";
+  if (/youtube\.com\/(playlist|@|channel\/)/i.test(s)) return "Bu bir kanal ya da liste linki; tek bir videonun linkini yapıştır.";
+  if (/^(https?:\/\/)?\S+\.\S+/.test(s)) return "Bu linki tanımadım. Spotify şarkı ya da YouTube video linki olmalı.";
+  return null;
 }
 
 const NOISE =

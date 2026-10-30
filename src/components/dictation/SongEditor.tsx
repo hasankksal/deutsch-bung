@@ -2,8 +2,8 @@
 
 import { useRef, useState } from "react";
 import { formatLyrics, parseLyrics, parseSubtitles } from "@/lib/dictation/cloze";
-import { fetchLinkInfo, parseMediaLink, pickBest, type MediaLink } from "@/lib/dictation/link";
-import { formatDuration, searchLyrics, type LyricsHit } from "@/lib/dictation/lyrics-search";
+import { fetchLinkInfo, linkProblem, parseMediaLink, pickBest, type MediaLink } from "@/lib/dictation/link";
+import { formatDuration, LyricsBusyError, searchLyrics, type LyricsHit } from "@/lib/dictation/lyrics-search";
 import { saveSong, type UserSong } from "@/lib/dictation/store";
 import { Button, Card, Chip, LABEL, Segmented, Spinner, cn } from "../ui";
 
@@ -21,6 +21,12 @@ async function readText(file: File): Promise<string> {
   const buf = await file.arrayBuffer();
   const utf8 = new TextDecoder("utf-8").decode(buf);
   return utf8.includes("�") ? new TextDecoder("windows-1252").decode(buf) : utf8;
+}
+
+function searchErrorText(e: unknown): string {
+  if (e instanceof LyricsBusyError) return e.message;
+  if (e instanceof Error && e.message.startsWith("Sözler")) return e.message;
+  return "Sözler aranamadı, internet bağlantını kontrol et.";
 }
 
 function baseName(name: string): string {
@@ -102,16 +108,16 @@ export function SongEditor({
     try {
       await runSearch(artist, track, ctrl, false);
     } catch (e) {
-      if (!ctrl.signal.aborted) setError(e instanceof Error && e.message.startsWith("Sözler") ? e.message : "Sözler aranamadı, bağlantını kontrol et.");
+      if (!ctrl.signal.aborted) setError(searchErrorText(e));
     } finally {
       if (!ctrl.signal.aborted) setSearching(false);
     }
   };
 
   /** A pasted YouTube or Spotify link: read its title and fetch the lyrics that go with it. */
-  const lookUp = async (ml: MediaLink) => {
+  const lookUp = async (ml: MediaLink, again = false) => {
     const key = `${ml.kind}:${ml.id}`;
-    if (lookedUp.current === key) return;
+    if (lookedUp.current === key && !again) return;
     lookedUp.current = key;
     setMedia(ml.kind);
     setError(null);
@@ -119,18 +125,25 @@ export function SongEditor({
     const ctrl = fresh();
     setLinkStatus({ kind: "loading" });
     setTextMode("ara");
+    const fail = (message: string) => {
+      if (ctrl.signal.aborted) return;
+      lookedUp.current = ""; // pasting the same link again tries again
+      setLinkStatus({ kind: "error", message });
+    };
+    let info;
     try {
-      const info = await fetchLinkInfo(ml, ctrl.signal);
-      setArtist(info.artist);
-      setTrack(info.track);
-      const found = await runSearch(info.artist, info.track, ctrl, true);
-      setLinkStatus(
-        found.length
-          ? { kind: "found", title: info.title }
-          : { kind: "error", message: `"${info.title}" için söz bulamadım. Aşağıda adını düzeltip tekrar ara.` },
-      );
+      info = await fetchLinkInfo(ml, ctrl.signal);
     } catch {
-      if (!ctrl.signal.aborted) setLinkStatus({ kind: "error", message: "Linkin bilgisi alınamadı. Şarkıyı aşağıdan adıyla ara." });
+      return fail("Linkin başlığını okuyamadım (video gizli ya da kısıtlı olabilir). Şarkıyı aşağıdan adıyla ara.");
+    }
+    setArtist(info.artist);
+    setTrack(info.track);
+    try {
+      const found = await runSearch(info.artist, info.track, ctrl, true);
+      if (found.length) setLinkStatus({ kind: "found", title: info.title });
+      else fail(`"${info.title}" için söz bulamadım. Aşağıda sanatçıyı ya da adı düzeltip tekrar ara.`);
+    } catch (e) {
+      fail(searchErrorText(e));
     }
   };
 
@@ -178,6 +191,10 @@ export function SongEditor({
             setError(null);
             const ml = parseMediaLink(e.target.value);
             if (ml) lookUp(ml);
+            else {
+              const problem = linkProblem(e.target.value);
+              setLinkStatus(problem ? { kind: "error", message: problem } : { kind: "idle" });
+            }
           }}
           inputMode="url"
           autoFocus={!song && initialMode === "ara"}
@@ -194,7 +211,16 @@ export function SongEditor({
             Buldum: <b>{linkStatus.title}</b>. Sözler aşağıda; yanlışsa listeden başkasını seç.
           </p>
         )}
-        {linkStatus.kind === "error" && <p className="text-sm text-red-pencil">{linkStatus.message}</p>}
+        {linkStatus.kind === "error" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm text-red-pencil">{linkStatus.message}</p>
+            {parsedLink && (
+              <Button size="sm" onClick={() => lookUp(parsedLink, true)}>
+                Tekrar dene
+              </Button>
+            )}
+          </div>
+        )}
         {linkStatus.kind === "idle" && !link && (
           <p className="text-xs text-pencil">
             Spotify&apos;da paylaş → bağlantıyı kopyala, ya da YouTube&apos;da videonun adresini kopyala. Film için aşağıdan altyazı dosyası seç.

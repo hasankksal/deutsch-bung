@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guessArtistTrack, parseMediaLink, parseSpotifyId, pickBest } from "./link";
+import { guessArtistTrack, linkProblem, parseMediaLink, parseSpotifyId, pickBest } from "./link";
 import type { LyricsHit } from "./lyrics-search";
 
 describe("parseSpotifyId", () => {
@@ -21,6 +21,21 @@ describe("parseMediaLink", () => {
     expect(parseMediaLink("https://youtu.be/dQw4w9WgXcQ")).toEqual({ kind: "youtube", id: "dQw4w9WgXcQ" });
     expect(parseMediaLink("https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC")).toEqual({ kind: "spotify", id: "4uLU6hMCjMI75M1A2tKUQC" });
     expect(parseMediaLink("")).toBeNull();
+  });
+
+  it("finds the link inside shared text", () => {
+    expect(parseMediaLink("Hör dir das an: https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=1.")).toEqual({
+      kind: "spotify",
+      id: "4uLU6hMCjMI75M1A2tKUQC",
+    });
+    expect(parseMediaLink("(https://youtu.be/dQw4w9WgXcQ)")).toEqual({ kind: "youtube", id: "dQw4w9WgXcQ" });
+  });
+
+  it("explains links it cannot use", () => {
+    expect(linkProblem("https://spotify.link/AbCdEf")).toMatch(/Kısa Spotify/);
+    expect(linkProblem("https://open.spotify.com/album/4uLU6hMCjMI75M1A2tKUQC")).toMatch(/albüm/);
+    expect(linkProblem("https://youtu.be/dQw4w9WgXcQ")).toBeNull();
+    expect(linkProblem("Rammstein")).toBeNull();
   });
 });
 
